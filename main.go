@@ -12,7 +12,42 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"gopkg.in/yaml.v3"
 )
+
+// Config holds values parsed from the lazyclaude config file.
+type Config struct {
+	ResourcesDir string `yaml:"resources_dir"`
+	ClaudeDir    string `yaml:"claude_dir"`
+}
+
+// loadConfig reads the config file from $XDG_CONFIG_HOME/lazyclaude/config.yaml
+// and expands environment variables in values.
+func loadConfig() (*Config, error) {
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		configHome = filepath.Join(home, ".config")
+	}
+
+	data, err := os.ReadFile(filepath.Join(configHome, "lazyclaude", "config.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing config: %w", err)
+	}
+
+	cfg.ResourcesDir = os.ExpandEnv(cfg.ResourcesDir)
+	cfg.ClaudeDir = os.ExpandEnv(cfg.ClaudeDir)
+
+	return &cfg, nil
+}
 
 func init() {
 	tview.Borders.Horizontal = '─'
@@ -63,8 +98,8 @@ type App struct {
 	availableItems []Item
 	appliedItems   []Item
 
-	projectRoot string
-	globalRoot  string
+	globalRoot string
+	claudeDir  string
 
 	helpOpen bool
 	treeOpen bool
@@ -77,15 +112,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	a := &App{
+		globalRoot: filepath.Join(home, ".config", "claude"),
 	}
 
-	a := &App{
-		projectRoot: projectRoot,
-		globalRoot:  filepath.Join(home, ".config", "claude"),
+	if cfg, err := loadConfig(); err == nil {
+		if cfg.ResourcesDir != "" {
+			a.globalRoot = cfg.ResourcesDir
+		}
+		if cfg.ClaudeDir != "" {
+			a.claudeDir = cfg.ClaudeDir
+		}
+	}
+
+	if a.claudeDir == "" {
+		fmt.Fprintf(os.Stderr, "Error: claude_dir not set in config\n")
+		os.Exit(1)
 	}
 
 	if err := a.loadCategories(); err != nil {
@@ -122,7 +164,7 @@ func (a *App) loadCategories() error {
 		a.categories = append(a.categories, Category{
 			Name:       entry.Name(),
 			GlobalDir:  filepath.Join(a.globalRoot, entry.Name()),
-			ProjectDir: filepath.Join(a.projectRoot, ".claude", entry.Name()),
+			ProjectDir: filepath.Join(a.claudeDir, entry.Name()),
 		})
 	}
 
