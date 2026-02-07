@@ -37,6 +37,14 @@ type Item struct {
 	GlobalPath string
 }
 
+// DisplayName returns the item name without file extension for non-directory items.
+func (item Item) DisplayName() string {
+	if item.IsDir {
+		return item.Name
+	}
+	return strings.TrimSuffix(item.Name, filepath.Ext(item.Name))
+}
+
 // App holds all application state.
 type App struct {
 	app             *tview.Application
@@ -516,10 +524,8 @@ func (a *App) refreshAvailableList() {
 
 	for _, item := range a.availableItems {
 		prefix := "  "
-		if item.IsDir {
-			prefix = "[cyan]d[-] "
-		}
-		a.availableList.AddItem(prefix+item.Name, "", 0, nil)
+		displayName := item.DisplayName()
+		a.availableList.AddItem(prefix+displayName, "", 0, nil)
 	}
 
 	if currentIdx >= len(a.availableItems) {
@@ -536,10 +542,8 @@ func (a *App) refreshAppliedList() {
 
 	for _, item := range a.appliedItems {
 		prefix := "[green]+[-] "
-		if item.IsDir {
-			prefix = "[green]+[-][cyan]d[-] "
-		}
-		a.appliedList.AddItem(prefix+item.Name, "", 0, nil)
+		displayName := item.DisplayName()
+		a.appliedList.AddItem(prefix+displayName, "", 0, nil)
 	}
 
 	if currentIdx >= len(a.appliedItems) {
