@@ -59,6 +59,7 @@ type App struct {
 	globalRoot  string
 
 	helpOpen bool
+	treeOpen bool
 }
 
 func main() {
@@ -282,6 +283,13 @@ func (a *App) setupUI() {
 func (a *App) setupKeybindings() {
 	a.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		// Modal priority chain
+		if a.treeOpen {
+			if event.Key() == tcell.KeyEsc || event.Rune() == 'q' {
+				a.closeTree()
+				return nil
+			}
+			return event
+		}
 		if a.helpOpen {
 			if event.Key() == tcell.KeyEsc || event.Rune() == 'q' {
 				a.closeHelp()
@@ -332,6 +340,9 @@ func (a *App) setupKeybindings() {
 				return nil
 			case ' ':
 				a.toggleSelected()
+				return nil
+			case 't':
+				a.showTree()
 				return nil
 			case '?':
 				a.showHelp()
@@ -559,7 +570,7 @@ func (a *App) updatePanelTitles() {
 }
 
 func (a *App) updateStatusBar() {
-	a.statusBar.SetText(" [1-2] panels  [j/k] navigate  [J/K] scroll preview  [space/enter] toggle  [/] tabs  [?] help  [q] quit")
+	a.statusBar.SetText(" [1-2] panels  [j/k] navigate  [J/K] scroll preview  [space/enter] toggle  [/] tabs  [t] tree  [?] help  [q] quit")
 }
 
 // --- Preview ---
@@ -667,6 +678,55 @@ func (a *App) buildTree(b *strings.Builder, dir, prefix string, depth int) {
 	}
 }
 
+// --- Tree modal ---
+
+func (a *App) showTree() {
+	// Get the currently selected item
+	var item *Item
+	switch a.currentPanelIdx {
+	case 0:
+		idx := a.availableList.GetCurrentItem()
+		if idx >= 0 && idx < len(a.availableItems) {
+			item = &a.availableItems[idx]
+		}
+	case 1:
+		idx := a.appliedList.GetCurrentItem()
+		if idx >= 0 && idx < len(a.appliedItems) {
+			item = &a.appliedItems[idx]
+		}
+	}
+
+	if item == nil || !item.IsDir {
+		return
+	}
+
+	a.treeOpen = true
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("[cyan::b]%s/[-:-:-]\n\n", item.Name))
+	a.buildTree(&b, item.GlobalPath, "", 0)
+	b.WriteString("\n[darkgray]Press Escape or q to close[-]")
+
+	treeText := tview.NewTextView().
+		SetDynamicColors(true).
+		SetScrollable(true).
+		SetText(b.String())
+	treeText.SetBorder(true).
+		SetTitle(fmt.Sprintf(" %s — Tree ", item.Name)).
+		SetTitleAlign(tview.AlignCenter).
+		SetBorderColor(tcell.ColorGreen)
+
+	a.pages.AddPage("tree", modal(treeText, 60, 25), true, true)
+	a.app.SetFocus(treeText)
+}
+
+func (a *App) closeTree() {
+	a.treeOpen = false
+	a.pages.RemovePage("tree")
+	a.app.SetFocus(a.panels[a.currentPanelIdx])
+	a.updateBorderColors()
+}
+
 // --- Help modal ---
 
 func (a *App) showHelp() {
@@ -690,6 +750,7 @@ func (a *App) showHelp() {
 [green]Actions:[-]
   Space / Enter Apply or remove item
                 (Available → apply, Applied → remove)
+  t             Show folder tree (directories)
 
 [green]Meta:[-]
   q / Esc       Quit
