@@ -42,13 +42,19 @@ This copies the binary to `~/.local/bin/`. Make sure `~/.local/bin` is in your `
 
 ## Configuration
 
-LazyClaude reads its configuration from:
+LazyClaude resolves its config directory in this order:
 
-```
-$XDG_CONFIG_HOME/lazyclaude/config.yaml
-```
+1. `$LAZYCLAUDE_CONFIG_DIR` — if set, used directly
+2. `$XDG_CONFIG_HOME/lazyclaude` — if `XDG_CONFIG_HOME` is set
+3. `~/.config/lazyclaude` — default fallback
 
-If `$XDG_CONFIG_HOME` is not set, it defaults to `~/.config/lazyclaude/config.yaml`.
+The config file is expected at `<config_dir>/config.yaml`.
+
+For example, to set a custom config directory:
+
+```bash
+export LAZYCLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/lazyclaude"
+```
 
 ### Config file
 

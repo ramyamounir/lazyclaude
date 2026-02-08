@@ -21,19 +21,23 @@ type Config struct {
 	ClaudeDir    string `yaml:"claude_dir"`
 }
 
-// loadConfig reads the config file from $XDG_CONFIG_HOME/lazyclaude/config.yaml
-// and expands environment variables in values.
+// loadConfig reads the config file from the lazyclaude config directory.
+// Resolution order: $LAZYCLAUDE_CONFIG_DIR, $XDG_CONFIG_HOME/lazyclaude, ~/.config/lazyclaude.
 func loadConfig() (*Config, error) {
-	configHome := os.Getenv("XDG_CONFIG_HOME")
-	if configHome == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
+	configDir := os.Getenv("LAZYCLAUDE_CONFIG_DIR")
+	if configDir == "" {
+		configHome := os.Getenv("XDG_CONFIG_HOME")
+		if configHome == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil, err
+			}
+			configHome = filepath.Join(home, ".config")
 		}
-		configHome = filepath.Join(home, ".config")
+		configDir = filepath.Join(configHome, "lazyclaude")
 	}
 
-	data, err := os.ReadFile(filepath.Join(configHome, "lazyclaude", "config.yaml"))
+	data, err := os.ReadFile(filepath.Join(configDir, "config.yaml"))
 	if err != nil {
 		return nil, err
 	}
